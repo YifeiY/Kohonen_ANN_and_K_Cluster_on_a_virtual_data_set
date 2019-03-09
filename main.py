@@ -208,7 +208,7 @@ def writeReport(ANN,KM,filename = report_filename):
 
               "\n\nK-Means:"
               "\n\t*terminates when SSE is the same:"
-                  "\n\t\t- network converges"
+                  "\n\t\t- best center point found"
               "\n\t*centers:" +
                   "\n\t\t" + str(KM[0][0]) +
                   "\n\t\t" + str(KM[0][1]) +
