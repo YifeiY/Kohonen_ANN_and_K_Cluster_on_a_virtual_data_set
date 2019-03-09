@@ -15,7 +15,7 @@ theta = 1
 network_config = [3,2]
 threshold = 0.1
 output_filename = "output.txt"
-
+report_filename = "report.txt"
 
 def main():
 
@@ -23,11 +23,12 @@ def main():
   header.append("kohonen")
   header.append("K-Means")
 
-  kohonenANN_out = kohonenANN(data)
+  kohonenANN_out,ANN_center,ANNSSE = kohonenANN(data)
 
-  kMeans_out = kMeans(data)
+  kMeans_out,KM_center, KMSSE = kMeans(data)
 
   writeOutput([header] + [data[i] + [kohonenANN_out[i],kMeans_out[i]] for i in range(len(data))])
+  writeReport([ANN_center,ANNSSE],[KM_center,KMSSE])
 ## END MAIN
 
 
@@ -43,7 +44,6 @@ def kMeans(data):
 
   while err != prev_err:
     prev_err = err
-
     err = 0
     iteration += 1
 
@@ -63,20 +63,24 @@ def kMeans(data):
         c2.append(row)
         c2_sum = [c2_sum[i] + row[i] for i in range(len(row))]
 
-
     w1 = [i/len(c1) for i in c1_sum]
     w2 = [i/len(c1) for i in c2_sum]
-
 
     err += sum([d ** 2 for d in [p[j] - w1[j] for j in range(len(w1)) for p in c1]])
     err += sum([d ** 2 for d in [p[j] - w1[j] for j in range(len(w2)) for p in c2]])
 
-  print("K-Means stabilized after", iteration, "iteration.\n")
+  print("K-Means stabilized after", iteration, "iteration.")
 
   output = []
+  errs = [0,0]
   for row in data:
-    output.append("A") if calculateDistance(w1, row) < calculateDistance(w2, row) else output.append("B")
-  return output
+    d1 = calculateDistance(w1, row)
+    d2 = calculateDistance(w2, row)
+    winner_index = 0 if d1 < d2 else 1
+
+    errs[winner_index] += [d1,d2][winner_index]
+    output.append("A") if d1 < d2 else output.append("B")
+  return output,[w1,w2],errs
 
 
 ## Use kohonen ANN to identify two clustering
@@ -99,14 +103,20 @@ def kohonenANN(data):
 
     prev_err = err
 
-  print("Network converged after", iteration, "iteration.\n")
+  print("Network converged after", iteration, "iteration.")
 
   output = []
+  errs = [0,0]
   for row in data:
     feedData(row, ann)
-    output.append('A' if kohonen(ann[0]['distance'], ann[1]['distance']) == 0 else 'B')
+    winner_index = kohonen(ann[0]['distance'], ann[1]['distance']) - 1
+    winner = ann[winner_index]
+    errs[winner_index] += ann[0]['distance'] + ann[1]['distance']
+    output.append('A' if winner_index == 0 else 'B')
   #showData(data, ann)
-  return output
+
+
+  return output,[node['weights']for node in ann], errs
 
 
 
@@ -175,8 +185,40 @@ def showData(data, ann):
   ax.scatter(center0[0], center0[1], center0[2], c='r', marker='*', s=100)
   center1 = ann[1]['weights']
   ax.scatter(center1[0], center1[1], center1[2], c='b', marker='*', s=100)
-  plt.show(block = False)
   plt.show()
+
+
+def writeReport(ANN,KM,filename = report_filename):
+  file = open(filename, "w")
+  file.write("Kohonen ANN:"
+              "\n\t*3 input nodes:"
+                  "\n\t\t- inputs has 3 arguments"
+              "\n\t*2 output nodes:"
+                  "\n\t\t- 2 expected classes"
+              "\n\t*terminates when SSE is the same:"
+                  "\n\t\t- network converges"
+              "\n\t*no iteration limit:"
+                  "\n\t\t- network will always converge"
+              "\n\t*centers:"+
+                  "\n\t\t" + str(ANN[0][0]) +
+                  "\n\t\t" + str(ANN[0][1]) +
+              "\n\t*SSE:"+
+                  "\n\t\t" + str(ANN[1][0]) +
+                  "\n\t\t" + str(ANN[1][1]) +
+
+              "\n\nK-Means:"
+              "\n\t*terminates when SSE is the same:"
+                  "\n\t\t- network converges"
+              "\n\t*centers:" +
+                  "\n\t\t" + str(KM[0][0]) +
+                  "\n\t\t" + str(KM[0][1]) +
+              "\n\t*centers:" +
+                  "\n\t\t" + str(KM[1][0]) +
+                  "\n\t\t" + str(KM[1][1]))
+
+  print("report has been written to " + "\"" + filename + "\".")
+
+
 
 
 ## write output file
@@ -187,7 +229,7 @@ def writeOutput(content,filename = output_filename):
     for item in row:
       line += str(item) + '\t'
     file.write(line + '\n')
-  print("output has been written to " + "\"" + output_filename + "\"." )
+  print("output has been written to " + "\"" + filename + "\"." )
 
 ## read in file
 def readFile(filename):
@@ -196,7 +238,6 @@ def readFile(filename):
     header = next(file)[:-1].split(',')
     for row in file:
       file_content.append([float(i) for i in row[:-1].split(',')])
-
   return [h + '\t' for h in header],file_content[1:]
 
 
